@@ -168,6 +168,7 @@ OCV_OPTION(BUILD_JASPER             "Build libjasper from source"    WIN32 OR AN
 OCV_OPTION(BUILD_JPEG               "Build libjpeg from source"      WIN32 OR ANDROID OR APPLE OR CARMA )
 OCV_OPTION(BUILD_PNG                "Build libpng from source"       WIN32 OR ANDROID OR APPLE OR CARMA )
 OCV_OPTION(BUILD_OPENEXR            "Build openexr from source"      WIN32 OR ANDROID OR APPLE OR CARMA )
+OCV_OPTION(BUILD_WEBP               "Build libwebp from source"      WIN32 OR APPLE )
 
 
 # OpenCV installation options
