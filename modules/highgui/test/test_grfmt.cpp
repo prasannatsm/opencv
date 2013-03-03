@@ -332,3 +332,60 @@ TEST(Highgui_Tiff, decode_tile16384x16384)
     remove(file4.c_str());
 }
 #endif
+
+#ifdef HAVE_WEBP
+
+TEST(Highgui_WebP, encode_decode_lossless_webp)
+{
+    cvtest::TS& ts = *cvtest::TS::ptr();
+    std::string input = std::string(ts.get_data_path()) + "../cv/shared/lena.png";
+    cv::Mat img = cv::imread(input);
+    ASSERT_FALSE(img.empty());
+
+    std::string output = cv::tempfile(".webp");
+    EXPECT_NO_THROW(cv::imwrite(output, img)); // lossless
+
+    cv::Mat img_webp = cv::imread(output);
+
+    ASSERT_FALSE(img_webp.empty());
+
+    EXPECT_TRUE(cv::norm(img, img_webp, NORM_INF) == 0);
+}
+
+TEST(Highgui_WebP, encode_decode_lossy_webp)
+{
+    cvtest::TS& ts = *cvtest::TS::ptr();
+    std::string input = std::string(ts.get_data_path()) + "/../cv/shared/lena.png";
+    cv::Mat img = cv::imread(input);
+    ASSERT_FALSE(img.empty());
+
+    for(int q = 100; q>=5; q-=5)
+    {
+        std::vector<int> params;
+        params.push_back(CV_IMWRITE_WEBP_QUALITY);
+        params.push_back(q);
+        string output = cv::tempfile(".webp");
+
+        EXPECT_NO_THROW(cv::imwrite(output, img, params));
+        cv::Mat img_webp = cv::imread(output);
+        EXPECT_FALSE(img_webp.empty());
+    }
+}
+
+
+TEST(Highgui_WebP, encode_big_image_webp)
+{
+    cvtest::TS& ts = *cvtest::TS::ptr();
+    std::string input = std::string(ts.get_data_path()) + "/../cv/shared/lena.png";
+    cv::Mat img = cv::imread(input);
+    cv::resize(img, img, cv::Size(8192, 8192));
+
+    std::vector<int> params;
+    params.push_back(CV_IMWRITE_WEBP_QUALITY);
+    params.push_back(95);
+
+    string output = cv::tempfile(".webp");
+    EXPECT_NO_THROW(cv::imwrite(output, img, params));
+}
+
+#endif
