@@ -4,7 +4,6 @@
 # ----------------------------------------------------------------------------
 project(${WEBP_LIBRARY})
 
-ocv_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 ocv_include_directories("${CMAKE_CURRENT_SOURCE_DIR}/cpu-features")
 
 file(GLOB lib_srcs dec/*.c dsp/*.c enc/*.c mux/*.c utils/*.c webp/*.c)
@@ -18,10 +17,10 @@ if(ANDROID AND ARMEABI_V7A AND NOT NEON)
   endforeach()
 endif()
 
-file(GLOB cpuf_s cpu-features/*.c)
-file(GLOB cpuf_h cpu-features/*.h)
-
 if(ANDROID)
+  file(GLOB cpuf_s cpu-features/*.c)
+  file(GLOB cpuf_h cpu-features/*.h)
+
   set(lib_srcs ${lib_srcs} ${cpuf_s})
   set(lib_hdrs ${lib_hdrs} ${cpuf_h})
 endif()

@@ -65,6 +65,7 @@ public:
     ImageDecoder newDecoder() const;
 
 protected:
+    Mat data;
 };
 
 class WebPEncoder : public BaseImageEncoder

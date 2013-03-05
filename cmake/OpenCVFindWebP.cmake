@@ -10,10 +10,14 @@
 
 # Look for the header file.
 
+unset(WEBP_FOUND)
+
 FIND_PATH(WEBP_INCLUDE_DIR NAMES webp/decode.h)
+
 if(${WEBP_INCLUDE_DIR} STREQUAL "")
-    add_definitions(-DBUILD_WEBP)
+    unset(WEBP_FOUND OFF)
 else()
+    set(WEBP_FOUND ON)
     MARK_AS_ADVANCED(WEBP_INCLUDE_DIR)
 
     # Look for the library.

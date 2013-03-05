@@ -42,16 +42,16 @@
 
 #ifdef HAVE_WEBP
 
+#include "precomp.hpp"
+
 #include <webp/decode.h>
 #include <webp/encode.h>
 #include <stdio.h>
+#include <limits.h>
 
-#include "precomp.hpp"
 #include "grfmt_webp.hpp"
 
 #include "opencv2/imgproc/imgproc.hpp"
-
-using namespace std;
 
 namespace cv
 {
@@ -59,7 +59,7 @@ namespace cv
 WebPDecoder::WebPDecoder()
 {
     m_signature = "RIFF....WEBPVP8 ";
-    m_buf_supported = false;
+    m_buf_supported = true;
 }
 
 WebPDecoder::~WebPDecoder()
@@ -71,7 +71,7 @@ ImageDecoder WebPDecoder::newDecoder() const
     return new WebPDecoder;
 }
 
-bool WebPDecoder::checkSignature( const string& signature ) const
+bool WebPDecoder::checkSignature( const std::string& signature ) const
 {
     size_t len = signatureLength();
     bool ret = false;
@@ -87,100 +87,73 @@ bool WebPDecoder::checkSignature( const string& signature ) const
 
 bool WebPDecoder::readHeader()
 {
-    bool header_read = false;
-    uint8_t *webp_file_data = NULL;
-    size_t webp_file_data_size = 0;
-    size_t data_read_size = 0;
-
-    FILE *webp_file = NULL;
-    webp_file = fopen(m_filename.c_str(), "rb");
-
-    if(webp_file == NULL)
+    if (m_buf.empty())
     {
-        goto Exit;
-    }
+        FILE * wfile = NULL;
 
-    fseek(webp_file, 0, SEEK_END);
-    webp_file_data_size = ftell(webp_file);
-    fseek(webp_file, 0, SEEK_SET);
+        wfile = fopen(m_filename.c_str(), "rb");
 
-    webp_file_data = (uint8_t *) malloc (webp_file_data_size);
-
-    if(webp_file_data == NULL)
-    {
-        goto Exit_CloseFile;
-    }
-
-    data_read_size = fread(webp_file_data, 1, webp_file_data_size,
-        webp_file);
-    if(data_read_size == webp_file_data_size)
-    {
-        if(WebPGetInfo(webp_file_data, webp_file_data_size, &m_width,
-            &m_height) == 1)
+        if(wfile != NULL)
         {
-            header_read = true;
-            m_type = CV_8UC3;
+            fseek(wfile, 0, SEEK_END);
+            size_t wfile_size = ftell(wfile);
+            fseek(wfile, 0, SEEK_SET);
+
+            if(wfile_size > (size_t)INT_MAX)
+            {
+                fclose(wfile);
+                return false;
+            }
+
+            data.create(1, (int)wfile_size, CV_8U);
+
+            size_t data_size = fread(data.data, 1, wfile_size, wfile);
+
+            if(wfile)
+            {
+                fclose(wfile);
+            }
+
+            if( data_size < wfile_size )
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false;
         }
     }
+    else
+    {
+        data = m_buf;
+    }
 
-    free(webp_file_data); webp_file_data = NULL;
+    if(WebPGetInfo(data.data, data.total(), &m_width, &m_height) == 1)
+    {
+        m_type = CV_8UC3;
+        return true;
+    }
 
-Exit_CloseFile:
-    fclose(webp_file); webp_file = NULL;
-
-Exit:
-    return header_read;
+    return false;
 }
 
 bool WebPDecoder::readData(Mat &img)
 {
-    bool data_read = false;
-
-    uint8_t *webp_file_data = NULL;
-    size_t webp_file_data_size = 0;
-    size_t data_read_size = 0;
-
-    FILE *webp_file = NULL;
-    webp_file = fopen(m_filename.c_str(), "rb");
-
-    if(webp_file == NULL)
-    {
-        goto Exit;
-    }
-
-    fseek(webp_file, 0, SEEK_END);
-    webp_file_data_size = ftell(webp_file);
-    fseek(webp_file, 0, SEEK_SET);
-
-    webp_file_data = (uint8_t *) malloc (webp_file_data_size);
-
-    if(webp_file_data == NULL)
-    {
-        goto Exit_CloseFile;
-    }
-
-    data_read_size = fread(webp_file_data, 1, webp_file_data_size,
-        webp_file);
-
-    if( (data_read_size == webp_file_data_size) &&
-        (m_width > 0 && m_height > 0) )
+    if( m_width > 0 && m_height > 0 )
     {
         uchar* out_data = img.data;
         unsigned int out_data_size = m_width * m_height * 3 * sizeof(uchar);
-        uchar *res_ptr = WebPDecodeBGRInto(webp_file_data,
-            webp_file_data_size, out_data, out_data_size, m_width * 3);
+
+        uchar *res_ptr = WebPDecodeBGRInto(data.data, data.total(), out_data, out_data_size, m_width * 3);
 
         if(res_ptr == out_data)
-            data_read = true;
+        {
+            return true;
+        }
     }
 
-    free(webp_file_data); webp_file_data = NULL;
-
-Exit_CloseFile:
-    fclose(webp_file); webp_file = NULL;
-
-Exit:
-    return data_read;
+    return false;
 }
 
 WebPEncoder::WebPEncoder()
@@ -198,10 +171,8 @@ ImageEncoder WebPEncoder::newEncoder() const
     return new WebPEncoder();
 }
 
-bool WebPEncoder::write(const Mat& img, const vector<int>& params)
+bool WebPEncoder::write(const Mat& img, const std::vector<int>& params)
 {
-    bool image_created = false;
-
     int channels = img.channels(), depth = img.depth();
     int width = img.cols, height = img.rows;
 
@@ -211,6 +182,7 @@ bool WebPEncoder::write(const Mat& img, const vector<int>& params)
 
     bool comp_lossless = true;
     int quality = 100;
+
     if (params.size() > 1)
     {
         if (params[0] == CV_IMWRITE_WEBP_QUALITY)
@@ -223,7 +195,7 @@ bool WebPEncoder::write(const Mat& img, const vector<int>& params)
             }
             if (quality > 100)
             {
-                quality = 100;
+                comp_lossless = true;
             }
         }
     }
@@ -232,7 +204,7 @@ bool WebPEncoder::write(const Mat& img, const vector<int>& params)
 
     if(depth != CV_8U)
     {
-        goto Exit;
+        return false;
     }
 
     if(channels == 1)
@@ -248,26 +220,36 @@ bool WebPEncoder::write(const Mat& img, const vector<int>& params)
     }
     else
     {
-        size = WebPEncodeBGR(image->data, width, height, ((width * 3 + 3) & ~3),
-            (float) quality, &out);
+        size = WebPEncodeBGR(image->data, width, height, ((width * 3 + 3) & ~3), (float)quality, &out);
     }
 
     if(size > 0)
     {
-        image_created = true;
-
-        FILE *fd = fopen(m_filename.c_str(), "wb");
-        if(fd != NULL)
+        if(m_buf)
         {
-            fwrite(out, size, sizeof(uint8_t), fd);
-            fclose(fd); fd = NULL;
+            m_buf->resize(size);
+            memcpy(&(*m_buf)[0], out, size);
         }
+        else
+        {
+            FILE *fd = fopen(m_filename.c_str(), "wb");
+            if(fd != NULL)
+            {
+                fwrite(out, size, sizeof(uint8_t), fd);
+                fclose(fd); fd = NULL;
+            }
+        }
+
+        if (out != NULL)
+        {
+            free(out);
+            out = NULL;
+        }
+
+        return true;
     }
 
-    free(out); out = NULL;
-
-Exit:
-    return image_created;
+    return false;
 }
 
 }

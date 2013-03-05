@@ -347,6 +347,36 @@ TEST(Highgui_WebP, encode_decode_lossless_webp)
 
     cv::Mat img_webp = cv::imread(output);
 
+    std::vector<unsigned char> buf;
+
+    FILE * wfile = NULL;
+
+    wfile = fopen(output.c_str(), "rb");
+    if (wfile != NULL)
+    {
+        fseek(wfile, 0, SEEK_END);
+        size_t wfile_size = ftell(wfile);
+        fseek(wfile, 0, SEEK_SET);
+
+        buf.resize(wfile_size);
+
+        size_t data_size = fread(&buf[0], 1, wfile_size, wfile);
+
+        if(wfile)
+        {
+            fclose(wfile);
+        }
+
+        if (data_size != wfile_size)
+        {
+            EXPECT_TRUE(false);
+        }
+    }
+
+    cv::Mat decode = cv::imdecode(buf, CV_LOAD_IMAGE_COLOR);
+    ASSERT_FALSE(decode.empty());
+    EXPECT_TRUE(cv::norm(decode, img_webp, NORM_INF) == 0);
+
     ASSERT_FALSE(img_webp.empty());
 
     EXPECT_TRUE(cv::norm(img, img_webp, NORM_INF) == 0);
@@ -359,7 +389,7 @@ TEST(Highgui_WebP, encode_decode_lossy_webp)
     cv::Mat img = cv::imread(input);
     ASSERT_FALSE(img.empty());
 
-    for(int q = 100; q>=5; q-=5)
+    for(int q = 100; q>=0; q-=5)
     {
         std::vector<int> params;
         params.push_back(CV_IMWRITE_WEBP_QUALITY);
@@ -372,7 +402,6 @@ TEST(Highgui_WebP, encode_decode_lossy_webp)
     }
 }
 
-
 TEST(Highgui_WebP, encode_big_image_webp)
 {
     cvtest::TS& ts = *cvtest::TS::ptr();
@@ -384,8 +413,13 @@ TEST(Highgui_WebP, encode_big_image_webp)
     params.push_back(CV_IMWRITE_WEBP_QUALITY);
     params.push_back(95);
 
-    string output = cv::tempfile(".webp");
+    std::string output = cv::tempfile(".webp");
     EXPECT_NO_THROW(cv::imwrite(output, img, params));
+
+    img.create(10000, 10000, CV_8UC3);
+    cv::randu(img, 0, 256);
+    output = cv::tempfile(".webp");
+    EXPECT_NO_THROW(cv::imwrite(output, img));
 }
 
 #endif
